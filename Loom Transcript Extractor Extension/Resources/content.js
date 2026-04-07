@@ -7,6 +7,8 @@ if (!window.transcriptExtensionLoaded) {
     if (document.querySelector('video')) return true;
     // Loom or Vimeo iframe on page
     if (document.querySelector('iframe[src*="loom.com"], iframe[src*="vimeo.com"]')) return true;
+    // Loom or Vimeo URLs anywhere in the page (Skool uses non-standard elements)
+    if (document.body.innerHTML.includes('loom.com/share/') || document.body.innerHTML.includes('vimeo.com/')) return true;
     return false;
   };
 
@@ -93,6 +95,23 @@ if (!window.transcriptExtensionLoaded) {
       match = iframe.src.match(vimeoPattern);
       if (match) return { platform: 'vimeo', id: match[1] };
     }
+
+    // Search the page HTML for video URLs (Skool embeds Loom as non-standard elements)
+    console.warn('[LTE] Searching page HTML for video URLs...');
+    const html = document.body.innerHTML;
+
+    const loomHtmlMatch = html.match(/loom\.com\/share\/([a-f0-9]+)/i);
+    if (loomHtmlMatch) {
+      console.warn('[LTE] Found Loom ID in page HTML:', loomHtmlMatch[1]);
+      return { platform: 'loom', id: loomHtmlMatch[1] };
+    }
+
+    const vimeoHtmlMatch = html.match(/vimeo\.com\/(\d+)/i);
+    if (vimeoHtmlMatch) {
+      console.warn('[LTE] Found Vimeo ID in page HTML:', vimeoHtmlMatch[1]);
+      return { platform: 'vimeo', id: vimeoHtmlMatch[1] };
+    }
+
     return null;
   };
 
