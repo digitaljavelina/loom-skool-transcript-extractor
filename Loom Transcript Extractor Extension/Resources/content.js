@@ -1,34 +1,42 @@
 // Only run once
-if (!window.loomTranscriptExtensionLoaded) {
-  window.loomTranscriptExtensionLoaded = true;
+if (!window.transcriptExtensionLoaded) {
+  window.transcriptExtensionLoaded = true;
 
-  // Wait for video player to be ready
+  const hasVideoContent = () => {
+    // Direct video element on page
+    if (document.querySelector('video')) return true;
+    // Loom or Vimeo iframe on page
+    if (document.querySelector('iframe[src*="loom.com"], iframe[src*="vimeo.com"]')) return true;
+    return false;
+  };
+
+  // Wait for video player or video iframe to be ready
   const initTranscriptExtractor = () => {
-    console.log('🔍 Loom Transcript Extractor: Waiting for video...');
-    
-    // Check if video exists
+    console.log('🔍 Transcript Extractor: Waiting for video...');
+
     let checkCount = 0;
     const checkVideo = setInterval(() => {
       checkCount++;
-      const video = document.querySelector('video');
-      
-      if (video) {
-        console.log('✅ Video found after', checkCount, 'attempts');
+
+      if (hasVideoContent()) {
+        console.log('✅ Video content found after', checkCount, 'attempts');
         clearInterval(checkVideo);
-        // Wait for tracks to load
+        // Wait for player to fully initialize
         setTimeout(() => {
           console.log('🎬 Creating transcript window...');
           createTranscriptWindow();
-        }, 3000); // Give tracks more time to load
+        }, 2000);
       } else if (checkCount % 10 === 0) {
         console.log('⏳ Still waiting for video... attempt', checkCount);
       }
     }, 1000);
 
-    // Give it much longer in embedded context - 60 seconds
+    // Give it 60 seconds in embedded context
     setTimeout(() => {
       clearInterval(checkVideo);
-      console.log('❌ Video not found after 60 seconds. Loom embed may not have loaded.');
+      if (!hasVideoContent()) {
+        console.log('❌ No video content found after 60 seconds.');
+      }
     }, 60000);
   };
 
@@ -55,25 +63,35 @@ if (!window.loomTranscriptExtensionLoaded) {
     return transcript.join('\n\n');
   };
 
-  const extractVideoId = () => {
+  const detectVideo = () => {
     const url = window.location.href;
     console.warn('[LTE] Current URL:', url);
 
-    // Try current page URL (works inside Loom iframe or on loom.com directly)
+    // Check Loom URLs
     const loomPattern = /loom\.com\/(?:share|embed)\/([a-f0-9]+)/i;
     let match = url.match(loomPattern);
     if (match) {
-      console.warn('[LTE] Video ID from URL:', match[1]);
-      return match[1];
+      console.warn('[LTE] Loom video ID from URL:', match[1]);
+      return { platform: 'loom', id: match[1] };
     }
 
-    // Try finding Loom iframe on the page (works on Skool/Notion embeds)
-    const iframes = document.querySelectorAll('iframe[src*="loom.com"]');
-    console.warn('[LTE] Found', iframes.length, 'Loom iframes');
+    // Check Vimeo URLs (vimeo.com/123456 or player.vimeo.com/video/123456)
+    const vimeoPattern = /vimeo\.com\/(?:video\/)?(\d+)/i;
+    match = url.match(vimeoPattern);
+    if (match) {
+      console.warn('[LTE] Vimeo video ID from URL:', match[1]);
+      return { platform: 'vimeo', id: match[1] };
+    }
+
+    // Check iframes on the page (for embeds on Skool/Notion/other sites)
+    const iframes = document.querySelectorAll('iframe[src*="loom.com"], iframe[src*="vimeo.com"]');
+    console.warn('[LTE] Found', iframes.length, 'video iframes');
     for (const iframe of iframes) {
       console.warn('[LTE] iframe src:', iframe.src);
       match = iframe.src.match(loomPattern);
-      if (match) return match[1];
+      if (match) return { platform: 'loom', id: match[1] };
+      match = iframe.src.match(vimeoPattern);
+      if (match) return { platform: 'vimeo', id: match[1] };
     }
     return null;
   };
@@ -85,15 +103,95 @@ if (!window.loomTranscriptExtensionLoaded) {
     return resp.json();
   };
 
-  const fetchFullTranscript = async () => {
-    console.warn('[LTE] === fetchFullTranscript starting ===');
+  const fetchVimeoTranscript = async (videoId) => {
+    console.warn('[LTE] === Vimeo transcript fetch for:', videoId, '===');
 
-    const videoId = extractVideoId();
-    if (!videoId) {
-      console.error('[LTE] Could not extract video ID');
-      throw new Error('Could not determine Loom video ID');
+    // Strategy 1: Fetch player config which contains text track URLs
+    try {
+      console.warn('[LTE] Vimeo: Fetching player config');
+      const configResp = await fetch(`https://player.vimeo.com/video/${videoId}/config`, {
+        headers: { 'Referer': `https://player.vimeo.com/video/${videoId}` }
+      });
+      console.warn('[LTE] Vimeo config response:', configResp.status);
+      if (configResp.ok) {
+        const config = await configResp.json();
+        const textTracks = config?.request?.text_tracks;
+        if (textTracks && textTracks.length > 0) {
+          console.warn('[LTE] Vimeo: Found', textTracks.length, 'text tracks');
+          // Prefer English, fall back to first available
+          const track = textTracks.find(t => t.lang === 'en') || textTracks[0];
+          console.warn('[LTE] Vimeo: Using track:', track.lang, track.label || '');
+          if (track.url) {
+            const vttUrl = track.url.startsWith('http') ? track.url : `https://vimeo.com${track.url}`;
+            console.warn('[LTE] Vimeo: Fetching VTT from:', vttUrl);
+            const vttResp = await fetch(vttUrl);
+            if (vttResp.ok) return parseVTT(await vttResp.text());
+          }
+        } else {
+          console.warn('[LTE] Vimeo: No text_tracks in config');
+        }
+      }
+    } catch (e) {
+      console.warn('[LTE] Vimeo config failed:', e.message);
     }
-    console.warn('[LTE] Video ID:', videoId);
+
+    // Strategy 2: Try the Vimeo API for text tracks
+    try {
+      console.warn('[LTE] Vimeo: Trying /api/v2/video/{id}/texttracks');
+      const resp = await fetch(`https://player.vimeo.com/texttrack/${videoId}.vtt`);
+      if (resp.ok) {
+        const vtt = await resp.text();
+        if (vtt.includes('-->')) return parseVTT(vtt);
+      }
+    } catch (e) {
+      console.warn('[LTE] Vimeo texttrack failed:', e.message);
+    }
+
+    // Strategy 3: Try native TextTrack API (Vimeo player uses it)
+    try {
+      console.warn('[LTE] Vimeo: Trying TextTrack API');
+      const video = document.querySelector('video');
+      if (video?.textTracks?.length > 0) {
+        console.warn('[LTE] Vimeo: Found', video.textTracks.length, 'text track(s)');
+        // Try all tracks - Vimeo may use any kind (captions, subtitles, metadata)
+        for (let i = 0; i < video.textTracks.length; i++) {
+          const track = video.textTracks[i];
+          console.warn(`[LTE] Vimeo: Track ${i}: kind="${track.kind}", label="${track.label}", lang="${track.language}", mode="${track.mode}"`);
+
+          // Enable the track to load cues
+          const previousMode = track.mode;
+          track.mode = 'hidden';
+
+          // Wait for cues to load, with retries
+          for (let attempt = 0; attempt < 5; attempt++) {
+            await new Promise(r => setTimeout(r, 1000));
+            console.warn(`[LTE] Vimeo: Track ${i} attempt ${attempt + 1}: cues=${track.cues?.length || 0}`);
+            if (track.cues && track.cues.length > 0) {
+              const transcript = [];
+              for (let j = 0; j < track.cues.length; j++) {
+                const text = track.cues[j].text.replace(/<[^>]*>/g, '').trim();
+                if (text && !transcript.includes(text)) transcript.push(text);
+              }
+              if (transcript.length > 0) {
+                console.warn('[LTE] Vimeo: Extracted', transcript.length, 'segments from track', i);
+                return transcript.join('\n\n');
+              }
+            }
+          }
+          // Restore original mode if this track didn't work
+          track.mode = previousMode;
+        }
+      }
+      console.warn('[LTE] Vimeo: TextTracks count =', video?.textTracks?.length || 0);
+    } catch (e) {
+      console.warn('[LTE] Vimeo TextTrack failed:', e.message);
+    }
+
+    throw new Error('Could not fetch Vimeo transcript');
+  };
+
+  const fetchLoomTranscript = async (videoId) => {
+    console.warn('[LTE] === Loom transcript fetch for:', videoId, '===');
 
     // Strategy 1: Try multiple Loom REST API endpoints
     const apiEndpoints = [
@@ -336,8 +434,24 @@ if (!window.loomTranscriptExtensionLoaded) {
       }
     } catch (e) { /* last resort, ignore */ }
 
-    console.error('[LTE] ❌ All strategies failed');
-    throw new Error('Could not fetch transcript from any source');
+    console.error('[LTE] ❌ All Loom strategies failed');
+    throw new Error('Could not fetch Loom transcript from any source');
+  };
+
+  const fetchFullTranscript = async () => {
+    console.warn('[LTE] === fetchFullTranscript starting ===');
+
+    const video = detectVideo();
+    if (!video) {
+      console.error('[LTE] Could not detect video platform or ID');
+      throw new Error('Could not detect video platform or ID');
+    }
+    console.warn('[LTE] Platform:', video.platform, '| ID:', video.id);
+
+    if (video.platform === 'vimeo') {
+      return fetchVimeoTranscript(video.id);
+    }
+    return fetchLoomTranscript(video.id);
   };
 
   const createTranscriptWindow = () => {
@@ -566,7 +680,10 @@ if (!window.loomTranscriptExtensionLoaded) {
     // Download button
     downloadBtn.addEventListener('click', () => {
       if (downloadBtn.disabled) return;
-      const videoTitle = document.querySelector('.css-mlocso')?.textContent || 'loom-video';
+      const videoTitle = document.querySelector('.css-mlocso')?.textContent
+        || document.querySelector('.clip_info-subline--watch')?.textContent
+        || document.title
+        || 'video';
       const filename = `${videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-transcript.txt`;
       
       const blob = new Blob([textArea.value], { type: 'text/plain' });
@@ -603,10 +720,10 @@ if (!window.loomTranscriptExtensionLoaded) {
         clearInterval(captureInterval);
       }
       transcriptWindow.remove();
-      window.loomTranscriptExtensionLoaded = false;
+      window.transcriptExtensionLoaded = false;
     });
 
-    console.log('🚀 Loom Transcript Extractor loaded! Choose your mode.');
+    console.log('🚀 Transcript Extractor loaded! Choose your mode.');
   };
 
   // Initialize when DOM is ready

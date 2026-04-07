@@ -3,17 +3,34 @@
   "name": "Loom Transcript Extractor",
   "version": "1.4.0",
   "description": "Extract transcripts from Loom videos with instant or live capture modes (works on embedded videos!)",
-  "permissions": [],
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Extract Transcript"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "host_permissions": [
     "https://www.loom.com/*",
     "https://*.loom.com/*",
-    "https://cdn.loom.com/*"
+    "https://cdn.loom.com/*",
+    "https://vimeo.com/*",
+    "https://player.vimeo.com/*",
+    "https://*.vimeocdn.com/*"
   ],
   "content_scripts": [
     {
       "matches": [
         "https://www.loom.com/share/*",
         "https://www.loom.com/embed/*",
+        "https://vimeo.com/*",
+        "https://player.vimeo.com/video/*",
         "https://*.skool.com/*",
         "https://*.notion.site/*"
       ],

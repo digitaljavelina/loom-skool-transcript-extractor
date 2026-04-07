@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Safari Web Extension for macOS that extracts transcripts from Loom videos. Two-target Xcode project:
+Safari Web Extension for macOS that extracts transcripts from Loom and Vimeo videos. Two-target Xcode project:
 - **Main App** (`Loom Transcript Extractor/`) — macOS Cocoa container app with WKWebView settings UI
 - **Extension** (`Loom Transcript Extractor Extension/`) — Safari Web Extension (Manifest v3) with content script
 
@@ -36,6 +36,7 @@ xcodebuild -project "Loom Transcript Extractor.xcodeproj" -scheme "Loom Transcri
 
 Content script matches (defined in manifest.json):
 - `https://www.loom.com/share/*` and `https://www.loom.com/embed/*`
+- `https://vimeo.com/*` and `https://player.vimeo.com/video/*`
 - `https://*.skool.com/*` and `https://*.notion.site/*` (third-party embeds)
 
 ## Conventions

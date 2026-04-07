@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9954327D2F854AFE007FDEF7 /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 9954327C2F854AFE007FDEF7 /* background.js */; };
 		99F5C7782F82DCCE00E5E409 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F5C7772F82DCCE00E5E409 /* AppDelegate.swift */; };
 		99F5C77C2F82DCCE00E5E409 /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 99F5C77A2F82DCCE00E5E409 /* Main.html */; };
 		99F5C77E2F82DCCE00E5E409 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 99F5C77D2F82DCCE00E5E409 /* Icon.png */; };
@@ -47,6 +48,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		9954327C2F854AFE007FDEF7 /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = background.js; sourceTree = "<group>"; };
 		99F5C7742F82DCCE00E5E409 /* Loom Transcript Extractor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Loom Transcript Extractor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		99F5C7772F82DCCE00E5E409 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		99F5C77B2F82DCCE00E5E409 /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 		99F5C7A02F82DCCF00E5E409 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				9954327C2F854AFE007FDEF7 /* background.js */,
 				99F5C7A12F82DCCF00E5E409 /* icons */,
 				99F5C7A22F82DCCF00E5E409 /* manifest.json */,
 				99F5C7A32F82DCCF00E5E409 /* content.js */,
@@ -245,6 +248,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9954327D2F854AFE007FDEF7 /* background.js in Resources */,
 				99F5C7A62F82DCCF00E5E409 /* content.js in Resources */,
 				99F5C7A52F82DCCF00E5E409 /* manifest.json in Resources */,
 				99F5C7A42F82DCCF00E5E409 /* icons in Resources */,
