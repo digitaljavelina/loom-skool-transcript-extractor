@@ -9,7 +9,7 @@ import Cocoa
 import SafariServices
 import WebKit
 
-let extensionBundleIdentifier = "com.loomtranscript.extractor.Extension"
+let extensionBundleIdentifier = "com.loomtranscript.Loom-Transcript-Extractor.Extension"
 
 class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHandler {
 
